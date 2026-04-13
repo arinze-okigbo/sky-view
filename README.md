@@ -4,17 +4,15 @@ SkyView is a browser-based 3D globe built with Vite and Cesium. It layers flight
 
 ## Screenshots
 
-Place images in [`screenshots/`](screenshots/) (PNG or WebP). Filenames below are suggestions; rename the files and update the paths if you prefer.
+Files in [`screenshots/`](screenshots/):
 
-| Globe overview | Sidebar & layers |
-| :------------: | :--------------: |
-| ![Globe overview](screenshots/globe-overview.png) | ![Sidebar and layers](screenshots/sidebar-layers.png) |
+| Globe | Layers (HUD) |
+| :---: | :----------: |
+| ![Globe](screenshots/globe.png) | ![Layers HUD](screenshots/layers_hud.png) |
 
-| Flight / entity detail |
-| :--------------------: |
-| ![Detail panel](screenshots/detail-panel.png) |
-
-**Capturing:** run `npm run dev`, use your OS screenshot tool (on macOS: Cmd+Shift+4), or the browser’s “Capture screenshot” in devtools. Aim for **1200–1600px** width so the README stays readable on GitHub.
+| Satellite detail (HUD) | Main view |
+| :--------------------: | :-------: |
+| ![Satellite HUD](screenshots/satellite_hud.png) | ![Main](screenshots/main.png) |
 
 ## Prerequisites
 
