@@ -2,6 +2,20 @@
 
 SkyView is a browser-based 3D globe built with Vite and Cesium. It layers flight traffic, airports, landmarks, optional weather and satellite feeds, and related UI on a Google Photorealistic 3D Tiles globe when keys are present, with sensible fallbacks when they are not.
 
+## Screenshots
+
+Place images in [`screenshots/`](screenshots/) (PNG or WebP). Filenames below are suggestions; rename the files and update the paths if you prefer.
+
+| Globe overview | Sidebar & layers |
+| :------------: | :--------------: |
+| ![Globe overview](screenshots/globe-overview.png) | ![Sidebar and layers](screenshots/sidebar-layers.png) |
+
+| Flight / entity detail |
+| :--------------------: |
+| ![Detail panel](screenshots/detail-panel.png) |
+
+**Capturing:** run `npm run dev`, use your OS screenshot tool (on macOS: Cmd+Shift+4), or the browser’s “Capture screenshot” in devtools. Aim for **1200–1600px** width so the README stays readable on GitHub.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) 18 or newer (there is no `engines` field in `package.json`; this matches typical Vite 8 requirements).

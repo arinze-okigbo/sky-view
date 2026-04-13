@@ -1,23 +1,28 @@
 import * as Cesium from 'cesium';
 import { emit, on } from './core/bus.js';
 import { getApiUrl } from './config.js';
+import { ICON_SATELLITE } from './layerIcons.js';
 import { getUserLocation } from './userLocation.js';
 
 const REFRESH_INTERVAL_MS = 90_000;
 const RETRY_INTERVAL_MS = 120_000;
 const SEARCH_RADIUS_DEGREES = 70;
 const CATEGORY_ID = 0;
-const TRACK_SECONDS = 120;
+/** N2YO `/positions/.../seconds` — preview length; API typically caps at 300. */
+const ORBIT_TRACK_SECONDS = 300;
 const DEFAULT_ALTITUDE_METERS = 0;
+/** N2YO can return hundreds of objects; cap entities to keep Cesium + fusion matrix work bounded. */
+const MAX_SATELLITES_SHOWN = 500;
 
 let _viewer = null;
-let _visible = false;
+let _visible = true;
 let _entitiesBySatId = new Map();
 let _satellitesById = new Map();
 let _pollTimer = null;
 let _abortController = null;
 let _selectedSatelliteId = null;
-let _trackEntity = null;
+let _orbitTrackEntity = null;
+let _groundTrackEntity = null;
 let _unsubscribeUserLocation = null;
 let _lastObserverLat = null;
 let _lastObserverLon = null;
@@ -100,13 +105,6 @@ function getObserver() {
   return getCameraObserver();
 }
 
-function getColorForAltitude(altitudeKm) {
-  if (altitudeKm < 800) return Cesium.Color.fromCssColorString('#5eead4');
-  if (altitudeKm < 2_000) return Cesium.Color.fromCssColorString('#74d9ff');
-  if (altitudeKm < 20_000) return Cesium.Color.fromCssColorString('#f59e0b');
-  return Cesium.Color.fromCssColorString('#a78bfa');
-}
-
 function toCartesian(satellite) {
   return Cesium.Cartesian3.fromDegrees(
     satellite.lon,
@@ -116,17 +114,22 @@ function toCartesian(satellite) {
 }
 
 function createSatelliteEntity(satellite) {
+  const selected = satellite.id === _selectedSatelliteId;
   const entity = _viewer.entities.add({
     position: toCartesian(satellite),
-    point: {
-      pixelSize: 11,
-      color: getColorForAltitude(satellite.altitudeKm),
-      outlineColor: Cesium.Color.fromCssColorString('#0b1220'),
-      outlineWidth: 3,
-      scaleByDistance: new Cesium.NearFarScalar(8e5, 1.3, 2.8e7, 0.85),
+    billboard: {
+      image: ICON_SATELLITE,
+      width: selected ? 44 : 36,
+      height: selected ? 44 : 36,
+      color: Cesium.Color.WHITE,
+      scaleByDistance: new Cesium.NearFarScalar(8e5, 1.25, 2.8e7, 0.82),
+      verticalOrigin: Cesium.VerticalOrigin.CENTER,
+      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
     },
     label: {
       text: satellite.name,
+      show: satellite.id === _selectedSatelliteId,
       font: '600 11px "Azeret Mono", monospace',
       fillColor: Cesium.Color.fromCssColorString('#f6f0e7'),
       outlineColor: Cesium.Color.fromCssColorString('#020611'),
@@ -148,25 +151,46 @@ function updateSatelliteEntity(entity, satellite) {
   entity.position = toCartesian(satellite);
   entity.show = _visible;
 
-  if (entity.point) {
-    entity.point.color = satellite.id === _selectedSatelliteId
-      ? Cesium.Color.fromCssColorString('#f8c76b')
-      : getColorForAltitude(satellite.altitudeKm);
-    entity.point.pixelSize = satellite.id === _selectedSatelliteId ? 14 : 11;
+  if (entity.billboard) {
+    const selected = satellite.id === _selectedSatelliteId;
+    entity.billboard.width = selected ? 44 : 36;
+    entity.billboard.height = selected ? 44 : 36;
+    entity.billboard.color = Cesium.Color.WHITE;
   }
 
   if (entity.label) {
     entity.label.text = satellite.name;
+    entity.label.show = satellite.id === _selectedSatelliteId;
   }
 
   _entityToSatellite.set(entity, satellite);
 }
 
 function clearTrack() {
-  if (_trackEntity) {
-    _viewer?.entities.remove(_trackEntity);
-    _trackEntity = null;
+  if (_orbitTrackEntity) {
+    _viewer?.entities.remove(_orbitTrackEntity);
+    _orbitTrackEntity = null;
   }
+  if (_groundTrackEntity) {
+    _viewer?.entities.remove(_groundTrackEntity);
+    _groundTrackEntity = null;
+  }
+}
+
+function positionsToSpaceCartesians(positions) {
+  return positions.map((entry) => Cesium.Cartesian3.fromDegrees(
+    Number(entry.satlongitude),
+    Number(entry.satlatitude),
+    Number(entry.sataltitude || 0) * 1000,
+  ));
+}
+
+function positionsToGroundCartesians(positions) {
+  return positions.map((entry) => Cesium.Cartesian3.fromDegrees(
+    Number(entry.satlongitude),
+    Number(entry.satlatitude),
+    0,
+  ));
 }
 
 function removeSatellite(satId) {
@@ -204,9 +228,14 @@ function applyAboveResponse(data, observer) {
   const category = data?.info?.category || 'ANY';
   const transactionCount = Number(data?.info?.transactionscount || 0);
   const rawSatellites = Array.isArray(data?.above) ? data.above : [];
-  const nextSatellites = rawSatellites
+  let nextSatellites = rawSatellites
     .map((entry) => normalizeSatellite(entry, category))
     .filter((entry) => Number.isFinite(entry.id) && Number.isFinite(entry.lat) && Number.isFinite(entry.lon));
+
+  if (nextSatellites.length > MAX_SATELLITES_SHOWN) {
+    nextSatellites.sort((a, b) => (a.altitudeKm ?? 1e9) - (b.altitudeKm ?? 1e9));
+    nextSatellites = nextSatellites.slice(0, MAX_SATELLITES_SHOWN);
+  }
 
   const seen = new Set();
 
@@ -255,7 +284,7 @@ function getAboveUrl(observer) {
   );
 }
 
-function getPositionsUrl(satelliteId, observer, seconds = TRACK_SECONDS) {
+function getPositionsUrl(satelliteId, observer, seconds = ORBIT_TRACK_SECONDS) {
   return getApiUrl(
     `/n2yo/positions/${satelliteId}/${observer.lat.toFixed(4)}/${observer.lon.toFixed(4)}/${Math.round(observer.alt)}/${seconds}`,
   );
@@ -454,16 +483,29 @@ export async function enrichSatellite(satelliteId) {
     clearTrack();
 
     if (positions.length >= 2 && _viewer) {
-      _trackEntity = _viewer.entities.add({
+      const spacePositions = positionsToSpaceCartesians(positions);
+      const groundPositions = positionsToGroundCartesians(positions);
+
+      _orbitTrackEntity = _viewer.entities.add({
         polyline: {
-          positions: positions.map((entry) => Cesium.Cartesian3.fromDegrees(
-            Number(entry.satlongitude),
-            Number(entry.satlatitude),
-            Number(entry.sataltitude || 0) * 1000,
-          )),
-          width: 2,
+          positions: spacePositions,
+          width: 4,
           arcType: Cesium.ArcType.NONE,
-          material: Cesium.Color.fromCssColorString('#f59e0b').withAlpha(0.8),
+          material: new Cesium.PolylineGlowMaterialProperty({
+            glowPower: 0.22,
+            taperPower: 0.45,
+            color: Cesium.Color.fromCssColorString('#f59e0b').withAlpha(0.92),
+          }),
+        },
+        show: _visible,
+      });
+
+      _groundTrackEntity = _viewer.entities.add({
+        polyline: {
+          positions: groundPositions,
+          width: 2,
+          arcType: Cesium.ArcType.GEODESIC,
+          material: Cesium.Color.fromCssColorString('#38bdf8').withAlpha(0.42),
         },
         show: _visible,
       });
@@ -522,4 +564,8 @@ export function initSatellites(viewer) {
       if (_visible) pollAbove();
     }, 1500);
   });
+
+  if (_visible) {
+    pollAbove();
+  }
 }

@@ -1642,13 +1642,21 @@ body::after {
 }
 
 .control-toggle-icon {
-  flex: 0 0 1.15rem;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 1rem;
   line-height: 1;
   opacity: 0.92;
+}
+
+.control-toggle-img {
+  display: block;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .control-toggle-label {
@@ -2005,6 +2013,31 @@ body::after {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
+}
+
+/* Column layout: injected .panel-control-bar + scrollable entity content */
+#detailDrawer.detail-drawer {
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-drawer-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-drawer-inner .drawer-header {
+  flex-shrink: 0;
+}
+
+.detail-drawer-inner .drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  height: auto;
 }
 
 .drawer-header {

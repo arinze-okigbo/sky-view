@@ -12,6 +12,7 @@
 import * as Cesium from 'cesium';
 import { emit, on } from './core/bus.js';
 import { getApiUrl } from './config.js';
+import { ICON_CAMERA } from './layerIcons.js';
 
 const POLL_INTERVAL = 120_000;
 const RETRY_INTERVAL = 180_000;
@@ -67,81 +68,6 @@ function setSnapshot(patch) {
     available: Boolean(getApiUrl('/windy/webcams')),
   };
   notifySnapshot();
-}
-
-// ── Camera icon ───────────────────────────────────────────────────────────────
-
-const _iconCache = new Map();
-
-function createCameraIcon(isLive = false) {
-  const key = isLive ? 'live' : 'still';
-  if (_iconCache.has(key)) return _iconCache.get(key);
-
-  const size = isLive ? 44 : 36;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = size / 2 - 2;
-
-  // Outer halo
-  ctx.beginPath();
-  ctx.arc(cx, cy, r + 1, 0, Math.PI * 2);
-  ctx.fillStyle = isLive ? 'rgba(94, 234, 212, 0.18)' : 'rgba(110, 231, 255, 0.14)';
-  ctx.fill();
-
-  // Badge background
-  ctx.beginPath();
-  ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
-  ctx.fillStyle = isLive ? 'rgba(15, 23, 42, 0.85)' : 'rgba(15, 23, 42, 0.75)';
-  ctx.fill();
-  ctx.strokeStyle = isLive ? 'rgba(94, 234, 212, 0.95)' : 'rgba(110, 231, 255, 0.88)';
-  ctx.lineWidth = isLive ? 2.4 : 2;
-  ctx.stroke();
-
-  // Camera body (rounded rect)
-  const bw = r * 0.72;
-  const bh = r * 0.52;
-  const bx = cx - bw / 2;
-  const by = cy - bh / 2 + 1;
-  const br = 2;
-  ctx.beginPath();
-  ctx.moveTo(bx + br, by);
-  ctx.lineTo(bx + bw - br, by);
-  ctx.quadraticCurveTo(bx + bw, by, bx + bw, by + br);
-  ctx.lineTo(bx + bw, by + bh - br);
-  ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - br, by + bh);
-  ctx.lineTo(bx + br, by + bh);
-  ctx.quadraticCurveTo(bx, by + bh, bx, by + bh - br);
-  ctx.lineTo(bx, by + br);
-  ctx.quadraticCurveTo(bx, by, bx + br, by);
-  ctx.closePath();
-  ctx.fillStyle = isLive ? '#5eead4' : '#6ee7ff';
-  ctx.fill();
-
-  // Lens
-  ctx.beginPath();
-  ctx.arc(cx, cy + 1, r * 0.22, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(5, 10, 20, 0.6)';
-  ctx.fill();
-
-  // Top bump
-  ctx.fillStyle = isLive ? '#5eead4' : '#6ee7ff';
-  ctx.fillRect(cx - r * 0.11, by - r * 0.16, r * 0.22, r * 0.16);
-
-  // Red live dot for webcams with live stream
-  if (isLive) {
-    ctx.beginPath();
-    ctx.arc(cx + r * 0.35, by + r * 0.18, 3, 0, Math.PI * 2);
-    ctx.fillStyle = '#ff4444';
-    ctx.fill();
-  }
-
-  const dataUrl = canvas.toDataURL('image/png');
-  _iconCache.set(key, dataUrl);
-  return dataUrl;
 }
 
 // ── Viewport bbox ─────────────────────────────────────────────────────────────
@@ -290,13 +216,15 @@ function toCartesian(camera) {
 function createCameraEntity(camera) {
   const position = toCartesian(camera);
   _webcamEcefById.set(camera.id, Cesium.Cartesian3.clone(position));
+  const live = Boolean(camera.playerUrl);
 
   const entity = _viewer.entities.add({
     position,
     billboard: {
-      image: createCameraIcon(Boolean(camera.playerUrl)),
-      width: 36,
-      height: 36,
+      image: ICON_CAMERA,
+      width: live ? 42 : 36,
+      height: live ? 42 : 36,
+      color: Cesium.Color.WHITE,
       heightReference: Cesium.HeightReference.NONE,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
       scaleByDistance: new Cesium.NearFarScalar(1e5, 1.6, 1e7, 0.65),

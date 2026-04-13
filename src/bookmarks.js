@@ -24,8 +24,8 @@ let _annotations = readJsonStorage(ANNOTATIONS_KEY, []) || []
 let _activeLayers = {
   flights: true,
   landmarks: true,
-  airports: false,
-  satellites: false,
+  airports: true,
+  satellites: true,
   cameras: false,
   weather: false,
   trajectories: true,

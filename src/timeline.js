@@ -54,7 +54,12 @@ function makeEvent(type, title, detail, entityId = null, entityKind = null) {
 }
 
 function pushEvent(event) {
-  _events = [..._events, event].slice(-MAX_EVENTS)
+  pushEvents([event])
+}
+
+function pushEvents(batch) {
+  if (!batch.length) return
+  _events = [..._events, ...batch].slice(-MAX_EVENTS)
   renderTimeline()
   emit('timeline:update', {
     count: _events.length,
@@ -199,9 +204,10 @@ function handleSatelliteUpdate() {
   const satellites = getSatellites()
   const nextIds = new Set(satellites.map((entry) => String(entry.id)))
 
-  satellites.forEach((satellite) => {
+  const batch = []
+  for (const satellite of satellites) {
     if (!_previousSatelliteIds.has(String(satellite.id))) {
-      pushEvent(makeEvent(
+      batch.push(makeEvent(
         'satellite_overhead',
         `${satellite.name} now overhead`,
         `${satellite.category || 'ANY'} · NORAD ${satellite.id}`,
@@ -209,9 +215,9 @@ function handleSatelliteUpdate() {
         'satellite',
       ))
     }
-  })
-
+  }
   _previousSatelliteIds = nextIds
+  pushEvents(batch)
 }
 
 export function initTimeline() {

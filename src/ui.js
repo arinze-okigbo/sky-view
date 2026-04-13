@@ -94,8 +94,8 @@ let _systemStatus = {
 let _tilesReady = false;
 let _flightsOn = true;
 let _landmarksOn = true;
-let _airportsOn = false;
-let _satellitesOn = false;
+let _airportsOn = true;
+let _satellitesOn = true;
 let _camerasOn = false;
 let _weatherOn = false;
 let _trajectoriesOn = true;
@@ -157,6 +157,7 @@ function teardownUiDocumentListeners() {
 const ui = {
   root: null,
   drawer: null,
+  drawerBody: null,
   searchInput: null,
   searchResults: null,
   shortcutsModal: null,
@@ -431,23 +432,23 @@ function buildShell() {
           <div class="section-heading"><span>Layers</span></div>
           <div class="toggle-grid">
             <button id="toggleFlights" class="control-toggle is-active">
-              <span class="control-toggle-icon" aria-hidden="true">✈</span>
+              <span class="control-toggle-icon" aria-hidden="true"><img class="control-toggle-img" src="/icons/plane.png" alt="" width="22" height="22" decoding="async" /></span>
               <span class="control-toggle-label">Flights</span>
             </button>
             <button id="toggleLandmarks" class="control-toggle is-active">
-              <span class="control-toggle-icon" aria-hidden="true">⌖</span>
+              <span class="control-toggle-icon" aria-hidden="true"><img class="control-toggle-img" src="/icons/camera.png" alt="" width="22" height="22" decoding="async" /></span>
               <span class="control-toggle-label">Landmarks</span>
             </button>
-            <button id="toggleAirports" class="control-toggle">
-              <span class="control-toggle-icon" aria-hidden="true">▦</span>
+            <button id="toggleAirports" class="control-toggle is-active">
+              <span class="control-toggle-icon" aria-hidden="true"><img class="control-toggle-img" src="/icons/airport.png" alt="" width="22" height="22" decoding="async" /></span>
               <span class="control-toggle-label">Airports</span>
             </button>
-            <button id="toggleSatellites" class="control-toggle">
-              <span class="control-toggle-icon" aria-hidden="true">🛰</span>
+            <button id="toggleSatellites" class="control-toggle is-active">
+              <span class="control-toggle-icon" aria-hidden="true"><img class="control-toggle-img" src="/icons/satellite.png" alt="" width="22" height="22" decoding="async" /></span>
               <span class="control-toggle-label">Satellites</span>
             </button>
             <button id="toggleCameras" class="control-toggle">
-              <span class="control-toggle-icon" aria-hidden="true">📷</span>
+              <span class="control-toggle-icon" aria-hidden="true"><img class="control-toggle-img" src="/icons/camera.png" alt="" width="22" height="22" decoding="async" /></span>
               <span class="control-toggle-label">Cameras</span>
             </button>
             <button id="toggleWeather" class="control-toggle">
@@ -643,8 +644,10 @@ function buildShell() {
         </div>
       </div>
 
-      <!-- ── Detail drawer ── -->
-      <aside id="detailDrawer" class="detail-drawer" aria-label="Detail"></aside>
+      <!-- ── Detail drawer (shell; body swapped in openDrawer so drag handle from panelManager persists) ── -->
+      <aside id="detailDrawer" class="detail-drawer" aria-label="Detail">
+        <div id="detailDrawerBody" class="detail-drawer-inner"></div>
+      </aside>
 
       <!-- ── Toasts ── -->
       <div id="toastRegion" class="toast-region" aria-live="assertive" aria-atomic="true"></div>
@@ -703,6 +706,7 @@ function buildShell() {
 
   ui.root = document.getElementById('appHud');
   ui.drawer = document.getElementById('detailDrawer');
+  ui.drawerBody = document.getElementById('detailDrawerBody');
   ui.searchInput = document.getElementById('searchInput');
   ui.searchResults = document.getElementById('searchResults');
   ui.shortcutsModal = document.getElementById('shortcutsModal');
@@ -1088,8 +1092,9 @@ function applySavedLayerState(activeLayers = []) {
 }
 
 function openDrawer(content) {
-  if (!ui.drawer) return;
-  ui.drawer.innerHTML = content;
+  if (!ui.drawer || !ui.drawerBody) return;
+  showPanel('detailDrawer');
+  ui.drawerBody.innerHTML = content;
   ui.drawer.classList.add('is-open');
   ui.drawer.querySelector('[data-drawer-close]')?.addEventListener('click', closeSidebar);
   bindDrawerActions();
@@ -1098,7 +1103,7 @@ function openDrawer(content) {
 export function closeSidebar() {
   if (!ui.drawer) return;
   ui.drawer.classList.remove('is-open');
-  ui.drawer.innerHTML = '';
+  if (ui.drawerBody) ui.drawerBody.innerHTML = '';
   setSelectedFlight(null);
   setSelectedSatellite(null);
   setSelectedCamera(null);
@@ -1382,10 +1387,10 @@ export function openSatelliteSidebar(satellite) {
     </section>
     <section class="drawer-section">
       <div class="section-heading">
-        <span>Observer track</span>
-        <span>120s look-ahead</span>
+        <span>Orbit preview</span>
+        <span>~5 min ahead</span>
       </div>
-      <div id="satelliteEnrichmentPanel" class="enrichment-state">Loading observer-relative track and look angles…</div>
+      <div id="satelliteEnrichmentPanel" class="enrichment-state">Loading orbit arc, ground track, and look angles…</div>
     </section>
     <section class="drawer-section">
       <div class="section-heading">
@@ -1426,7 +1431,7 @@ export function openSatelliteSidebar(satellite) {
       ${createRowMarkup('Elevation', escapeHtml(current ? `${current.elevation?.toFixed?.(1) ?? '—'}°` : '—'))}
       ${createRowMarkup('Right ascension', escapeHtml(current ? `${current.ra?.toFixed?.(1) ?? '—'}°` : '—'))}
       ${createRowMarkup('Declination', escapeHtml(current ? `${current.dec?.toFixed?.(1) ?? '—'}°` : '—'))}
-      ${createRowMarkup('Track points', escapeHtml(String(details.positions?.length || 0)))}
+      ${createRowMarkup('Track samples', escapeHtml(String(details.positions?.length || 0)))}
       ${createRowMarkup('Observer source', escapeHtml(details.observer?.label || _satelliteSnapshot.observerLabel || 'Unknown'))}
     `;
   });

@@ -1,6 +1,7 @@
 import * as Cesium from 'cesium';
 import { appConfig, getApiUrl, hasLiveFlightBackend } from './config.js';
 import { emit } from './core/bus.js';
+import { ICON_PLANE } from './layerIcons.js';
 import {
   formatAltitudeFeet,
   formatFlightIdentity,
@@ -128,50 +129,6 @@ function notifyFlightError(message, tone = 'warning') {
     title: tone === 'danger' ? 'Flight feed issue' : 'Flight feed status',
     message,
   });
-}
-
-function createAircraftIcon() {
-  const size = 52;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-
-  const context = canvas.getContext('2d');
-  const centerX = size / 2;
-  const centerY = size / 2;
-
-  context.clearRect(0, 0, size, size);
-  context.save();
-  context.translate(centerX, centerY);
-
-  context.beginPath();
-  context.moveTo(0, -20);
-  context.lineTo(10, 8);
-  context.lineTo(3.5, 6);
-  context.lineTo(3.5, 19);
-  context.lineTo(-3.5, 19);
-  context.lineTo(-3.5, 6);
-  context.lineTo(-10, 8);
-  context.closePath();
-  context.shadowBlur = 10;
-  context.shadowColor = 'rgba(255,255,255,0.38)';
-  context.fillStyle = 'rgba(255,255,255,0.97)';
-  context.fill();
-  context.shadowBlur = 0;
-
-  context.lineWidth = 2.4;
-  context.strokeStyle = 'rgba(5, 10, 20, 0.58)';
-  context.stroke();
-
-  context.beginPath();
-  context.moveTo(0, -15);
-  context.lineTo(0, 17);
-  context.lineWidth = 2.5;
-  context.strokeStyle = 'rgba(255, 255, 255, 0.72)';
-  context.stroke();
-
-  context.restore();
-  return canvas.toDataURL('image/png');
 }
 
 function toLiveFeedLabel() {
@@ -407,8 +364,11 @@ function applyProcessedAircraft(result) {
       current.lastSeen = now;
       current.updateTime = now;
 
-      current.billboard.color = Cesium.Color.clone(altitudeColor(alt), new Cesium.Color());
-      current.billboard.rotation = -Cesium.Math.toRadians(heading);
+      current.billboard.color = Cesium.Color.WHITE;
+      if (!current._surfaceUp) current._surfaceUp = new Cesium.Cartesian3();
+      Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(targetPosition, current._surfaceUp);
+      current.billboard.alignedAxis = current._surfaceUp;
+      current.billboard.rotation = -Cesium.Math.toRadians(Number.isFinite(heading) ? heading : 0);
       current.billboard.id = icao24;
 
       if (current.label) {
@@ -420,15 +380,18 @@ function applyProcessedAircraft(result) {
       continue;
     }
 
+    const surfaceUp = new Cesium.Cartesian3();
+    Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(targetPosition, surfaceUp);
+
     const billboard = _billboardCollection.add({
       id: icao24,
       position: targetPosition,
       image: _aircraftIcon,
       width: 48,
       height: 48,
-      color: altitudeColor(alt),
-      rotation: -Cesium.Math.toRadians(heading),
-      alignedAxis: Cesium.Cartesian3.ZERO,
+      color: Cesium.Color.WHITE,
+      rotation: -Cesium.Math.toRadians(Number.isFinite(heading) ? heading : 0),
+      alignedAxis: surfaceUp,
       scaleByDistance: new Cesium.NearFarScalar(60_000, 1.9, 7_500_000, 0.82),
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
       show: _flightsVisible,
@@ -461,6 +424,7 @@ function applyProcessedAircraft(result) {
       heading,
       velocity,
       verticalRate: vertRate,
+      _surfaceUp: surfaceUp,
       billboard,
       label,
       polyline: null,
@@ -688,7 +652,14 @@ function setupPreRender() {
           ? 0
           : Math.max(0.22, 1 - Math.max(0, now - aircraft.lastSeen - (STALE_THRESHOLD - 8_000)) / 8_000);
         aircraft.billboard.position = scratch;
-        aircraft.billboard.color = altitudeColor(aircraft.altitude).withAlpha(fadeAlpha);
+        aircraft.billboard.color = Cesium.Color.WHITE.withAlpha(fadeAlpha);
+        // Local “up” at aircraft position — rotation stays in the tangent plane (no screen-flip / upside-down).
+        if (aircraft._surfaceUp) {
+          Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(scratch, aircraft._surfaceUp);
+          aircraft.billboard.alignedAxis = aircraft._surfaceUp;
+        }
+        const h = Number.isFinite(aircraft.heading) ? aircraft.heading : 0;
+        aircraft.billboard.rotation = -Cesium.Math.toRadians(h);
       }
 
       if (aircraft.label) aircraft.label.position = scratch;
@@ -924,7 +895,7 @@ export function flyToFlight(aircraft) {
 
 export function initFlights(viewer) {
   _viewer = viewer;
-  _aircraftIcon = createAircraftIcon();
+  _aircraftIcon = ICON_PLANE;
 
   _billboardCollection = new Cesium.BillboardCollection({ scene: viewer.scene });
   _labelCollection = new Cesium.LabelCollection({ scene: viewer.scene });

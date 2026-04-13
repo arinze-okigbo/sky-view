@@ -3,13 +3,14 @@
  *
  * Features:
  *   - 70+ major airports dataset
- *   - Cesium entity rendering (canvas billboard + label, colour by hub tier)
+ *   - Cesium entity rendering (billboard + label; hub airports use a larger icon)
  *   - Camera fly-to on click (12 km altitude, angled view)
  *   - setAirportsVisible() / getAirports() public API
  *   - getEntityToAirport() WeakMap for unified click handler in main.js
  */
 
 import * as Cesium from 'cesium';
+import { ICON_AIRPORT } from './layerIcons.js';
 
 // ── Airport dataset ───────────────────────────────────────────────────────────
 // pax: millions of annual passengers (approximate)
@@ -102,67 +103,8 @@ export const AIRPORTS = [
 let _viewer        = null;
 /** @type {Cesium.Entity[]} */
 let _entities      = [];
-// Starts hidden — UI toggle button has no `active` class by default
-let _visible       = false;
+let _visible       = true;
 const _entityToAirport = new WeakMap();
-
-// ── Airport icon canvas ───────────────────────────────────────────────────────
-/** Cache so we don't re-draw the hub/non-hub icons repeatedly */
-const _iconCache = new Map();
-
-/**
- * Draw a runway-cross icon onto a canvas.
- * Hub airports get a brighter, larger icon with an outer ring.
- *
- * @param {boolean} isHub
- * @returns {string} PNG data URL
- */
-function createAirportIcon(isHub) {
-  const key = isHub ? 'hub' : 'regional';
-  if (_iconCache.has(key)) return _iconCache.get(key);
-
-  const size   = isHub ? 44 : 36;
-  const canvas = document.createElement('canvas');
-  canvas.width  = size;
-  canvas.height = size;
-  const ctx    = canvas.getContext('2d');
-  const cx = size / 2, cy = size / 2;
-  const r  = size / 2 - 2;
-
-  // Soft outer halo
-  ctx.beginPath();
-  ctx.arc(cx, cy, r + 1, 0, Math.PI * 2);
-  ctx.fillStyle = isHub ? 'rgba(94, 234, 212, 0.16)' : 'rgba(226, 232, 240, 0.12)';
-  ctx.fill();
-
-  // Main badge
-  ctx.beginPath();
-  ctx.arc(cx, cy, r - 1, 0, Math.PI * 2);
-  ctx.fillStyle = isHub ? 'rgba(15, 23, 42, 0.82)' : 'rgba(15, 23, 42, 0.72)';
-  ctx.fill();
-  ctx.strokeStyle = isHub ? 'rgba(110, 231, 255, 0.96)' : 'rgba(241, 245, 249, 0.88)';
-  ctx.lineWidth   = isHub ? 2.4 : 2;
-  ctx.stroke();
-
-  // Runway cross - horizontal bar
-  const barW = r * 0.82;
-  const barH = r * 0.28;
-  ctx.fillStyle = isHub ? '#f8fafc' : 'rgba(226, 232, 240, 0.94)';
-  ctx.fillRect(cx - barW, cy - barH / 2, barW * 2, barH);
-
-  // Runway cross - vertical bar
-  const barH2 = r * 0.62;
-  ctx.fillRect(cx - barH / 2, cy - barH2, barH, barH2 * 2);
-
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 0.32, 0, Math.PI * 2);
-  ctx.fillStyle = isHub ? 'rgba(94, 234, 212, 0.36)' : 'rgba(255, 255, 255, 0.16)';
-  ctx.fill();
-
-  const dataUrl = canvas.toDataURL('image/png');
-  _iconCache.set(key, dataUrl);
-  return dataUrl;
-}
 
 // ── Public API ────────────────────────────────────────────────────────────────
 /** @returns {typeof AIRPORTS} */
@@ -210,14 +152,13 @@ export function initAirports(viewer) {
   _viewer = viewer;
 
   for (const ap of AIRPORTS) {
-    const icon = createAirportIcon(ap.hub);
-
     const entity = viewer.entities.add({
       position: Cesium.Cartesian3.fromDegrees(ap.lon, ap.lat, 50),
       billboard: {
-        image:                    icon,
-        width:                    ap.hub ? 40 : 32,
-        height:                   ap.hub ? 40 : 32,
+        image:                    ICON_AIRPORT,
+        width:                    ap.hub ? 42 : 34,
+        height:                   ap.hub ? 42 : 34,
+        color:                    Cesium.Color.WHITE,
         heightReference:          Cesium.HeightReference.NONE,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
         scaleByDistance:          new Cesium.NearFarScalar(1e5, 1.8, 8e6, 0.68),

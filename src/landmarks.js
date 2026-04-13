@@ -11,6 +11,7 @@
  */
 
 import * as Cesium from 'cesium';
+import { ICON_CAMERA } from './layerIcons.js';
 
 // ── Landmark dataset ──────────────────────────────────────────────────────────
 export const LANDMARKS = [
@@ -221,16 +222,19 @@ export function initLandmarks(viewer) {
   for (const lm of LANDMARKS) {
     const entity = viewer.entities.add({
       position: Cesium.Cartesian3.fromDegrees(lm.lon, lm.lat, 200),
-      point: {
-        pixelSize:                16,
-        color:                    Cesium.Color.fromCssColorString('#12d8ff'),
-        outlineColor:             Cesium.Color.fromCssColorString('#ffffffcc'),
-        outlineWidth:             3,
+      billboard: {
+        image:                    ICON_CAMERA,
+        width:                    38,
+        height:                   38,
+        color:                    Cesium.Color.WHITE,
+        heightReference:          Cesium.HeightReference.NONE,
         disableDepthTestDistance: Number.POSITIVE_INFINITY,
-        scaleByDistance:          new Cesium.NearFarScalar(1e5, 1.65, 8e6, 0.9),
+        scaleByDistance:          new Cesium.NearFarScalar(1e5, 1.55, 8e6, 0.88),
+        verticalOrigin:           Cesium.VerticalOrigin.CENTER,
+        horizontalOrigin:         Cesium.HorizontalOrigin.CENTER,
       },
       label: {
-        text:                     `${lm.emoji} ${lm.name}`,
+        text:                     lm.name,
         font:                     '600 12px Inter, system-ui, sans-serif',
         fillColor:                Cesium.Color.WHITE,
         outlineColor:             Cesium.Color.fromCssColorString('#000000cc'),

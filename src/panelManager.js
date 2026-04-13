@@ -9,6 +9,7 @@ const STORAGE_PREFIX = 'sv-hud-';
 const MANAGED_PANELS = [
   { id: 'commandBar',   label: 'Command Bar' },
   { id: 'mainSidebar',  label: 'Main sidebar' },
+  { id: 'detailDrawer', label: 'Detail drawer' },
   { id: 'minimapShell', label: 'Minimap'     },
 ];
 
