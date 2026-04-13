@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SkyView</title>
+    <meta
+      name="description"
+      content="SkyView is a 3D globe app with flight traffic, airports, landmarks, and optional weather and satellite layers."
+    />
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <div id="loadingOverlay" aria-live="polite">
+      <div class="loading-shell">
+        <div class="loading-badge">SkyView</div>
+        <h1 class="loading-title" data-loading-title>Loading SkyView</h1>
+        <p class="loading-status" data-loading-status>Starting application</p>
+        <p class="loading-meta" data-loading-meta>3D globe with flight layers</p>
+        <div class="loading-orbit" aria-hidden="true">
+          <span class="loading-orbit-ring ring-a"></span>
+          <span class="loading-orbit-ring ring-b"></span>
+          <span class="loading-core"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="cesiumContainer"></div>
+  </body>
+</html>
